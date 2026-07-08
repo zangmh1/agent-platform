@@ -1,0 +1,3 @@
+# 查询当前用户信息
+GET http://127.0.0.1:8000/users/me
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwidXNlcm5hbWUiOiJ6aGFuZ3NhbiIsImVtYWlsIjoiemhhbmdzYW5AZXhhbXBsZS5jb20iLCJpc19zdXBlcnVzZXIiOmZhbHNlLCJleHAiOjE3ODM1MDMxMTMsImlhdCI6MTc4MzUwMTMxM30.iPpaB-USGvKwlTFk9vCwCMgiuQ3rzjORE39Dddiasb4
