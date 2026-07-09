@@ -38,6 +38,15 @@ async def get_user(
     return ResponseSchema(data=UserRead.model_validate(user))
 
 
+@router.delete("/{user_id}", response_model=ResponseSchema[None], summary="删除用户")
+async def delete_user(
+    user_id: int,
+    svc: UserService = Depends(get_user_service),
+):
+    await svc.delete_user(user_id)
+    return ResponseSchema()
+
+
 # @router.get("", response_model=ResponseSchema[list[UserRead]])
 # async def list_users(
 #     offset: int = 0,

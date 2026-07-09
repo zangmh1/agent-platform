@@ -10,6 +10,7 @@ from src.modules.captcha.api import router as captcha_router
 from src.modules.auth.api import router as auth_router
 from src.modules.permission.api import router as permission_router
 from src.modules.role.api import router as role_router
+from src.modules.provider.api import router as provider_router
 
 
 # 使用上下文管理器感知项目的生命周期
@@ -42,6 +43,15 @@ def create_app() -> FastAPI:
 
     # 注册异常处理器
     register_exception_handlers(app)
+    # 注册跨域中间件
+    from fastapi.middleware.cors import CORSMiddleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     # 注册路由
     app.include_router(user_router)
@@ -49,6 +59,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(permission_router, prefix="/api/v1")
     app.include_router(role_router, prefix="/api/v1")
+    app.include_router(provider_router, prefix="/api/v1")
 
     return app
 

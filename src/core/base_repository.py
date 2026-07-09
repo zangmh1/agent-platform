@@ -44,6 +44,11 @@ class BaseRepository(Generic[T]):
     async def delete(self, obj: T) -> None:
         await self.db.delete(obj)
         await self.db.flush()
+    
+    async def delete_by_id(self, id: int) -> None:
+        obj = await self.get_by_id(id)
+        await self.db.delete(obj)
+        await self.db.flush()
 
     async def get_page(
         self,

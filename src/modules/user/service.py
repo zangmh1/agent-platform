@@ -65,6 +65,10 @@ class UserService:
         user = await self.get_user(user_id)
         return user
     
+    async def delete_user(self, user_id: int) -> None:
+        user = await self.get_user(user_id)
+        await self.repo.delete(user)
+
     async def list_page_users(self, params: PageParams) -> PageResult[User]:
         items, total = await self.repo.search_page(
             offset=params.offset,
