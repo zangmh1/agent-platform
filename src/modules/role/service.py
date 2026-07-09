@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from src.core.base_schema import PageResult
+from src.core.deps import PageParams
 from src.core.exceptions import BizException
 from src.modules.role.schema import RoleUpdate
 from src.modules.role.model import Role
@@ -67,3 +71,16 @@ class RoleService:
         await self.repo.update(role)
         # 6. 返回更新后的 role（会自动带上新的 permissions）
         return role
+    
+    async def list_page_roles(self, params: PageParams) -> PageResult[Role]:
+        items, total = await self.repo.search_page(
+            offset=params.offset,
+            limit=params.page_size,
+            keyword=params.keyword,
+        )
+        return PageResult(
+            items=items,
+            total=total,
+            page=params.page,
+            page_size=params.page_size,
+        )

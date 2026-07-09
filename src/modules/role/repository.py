@@ -19,3 +19,13 @@ class RoleRepository(BaseRepository[Role]):
         stmt = select(Role).where(Role.id.in_(ids))
         result = await self.db.execute(stmt)
         return result.scalars().all()
+    
+    SEARCH_FIELDS = ["code", "name"]
+
+    async def search_page(self, offset: int, limit: int, keyword: str | None) -> tuple[list[Role], int]:
+        return await self.get_page(
+            offset=offset,
+            limit=limit,
+            keyword=keyword,
+            search_fields=self.SEARCH_FIELDS,
+        )

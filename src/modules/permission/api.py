@@ -4,7 +4,8 @@
 # PUT	/api/v1/permissions/{permission_id}	更新权限
 # DELETE	/api/v1/permissions/{permission_id}	删除权限
 from fastapi import APIRouter, Depends
-from src.core.base_schema import ResponseSchema
+from src.core.base_schema import PageResult, ResponseSchema
+from src.core.deps import PageParams
 from src.infra.database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.modules.permission.schema import PermissionCreate, PermissionRead, PermissionUpdate
@@ -47,3 +48,13 @@ service: PermissionService = Depends(get_permission_service)):
     """删除权限"""
     await service.delete_permission(permission_id)
     return ResponseSchema(data=None)
+
+@router.get("", response_model=ResponseSchema[PageResult[PermissionRead]], summary="分页查询权限列表")
+async def list_permissions(
+    params: PageParams = Depends(),
+    svc: PermissionService = Depends(get_permission_service),
+):
+    page_result = await svc.list_page_permissions(params)
+    # 需要把 ORM 对象转成 Pydantic 对象
+    page_result.items = [PermissionRead.model_validate(u) for u in page_result.items]
+    return ResponseSchema(data=page_result)

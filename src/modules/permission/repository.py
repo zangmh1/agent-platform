@@ -13,3 +13,13 @@ class PermissionRepository(BaseRepository[Permission]):
         return await self.db.scalar(
             select(Permission).filter(Permission.code == code)
         )
+    
+    SEARCH_FIELDS = ["code", "name"]
+
+    async def search_page(self, offset: int, limit: int, keyword: str | None) -> tuple[list[Permission], int]:
+        return await self.get_page(
+            offset=offset,
+            limit=limit,
+            keyword=keyword,
+            search_fields=self.SEARCH_FIELDS,
+        )

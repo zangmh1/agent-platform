@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from src.core.base_schema import PageResult
+from src.core.deps import PageParams
 from src.core.exceptions import BizException
 from src.infra.database import AsyncSession
 from src.modules.permission.model import Permission
@@ -56,3 +60,16 @@ class PermissionService:
         # 2. 调用 repo.delete()
         await self.repo.delete(permission)
         return None
+
+    async def list_page_permissions(self, params: PageParams) -> PageResult[Permission]:
+        items, total = await self.repo.search_page(
+            offset=params.offset,
+            limit=params.page_size,
+            keyword=params.keyword,
+        )
+        return PageResult(
+            items=items,
+            total=total,
+            page=params.page,
+            page_size=params.page_size,
+        )
