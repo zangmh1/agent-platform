@@ -1,4 +1,4 @@
-from typing import TypeVar, Generic, Type, Sequence
+from typing import List, TypeVar, Generic, Type, Sequence
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.base_model import BaseModel
@@ -17,6 +17,13 @@ class BaseRepository(Generic[T]):
 
     async def get_by_id(self, id: int) -> T | None:
         return await self.db.get(self.model, id)
+
+    async def get_by_ids(self, ids: List[int]) -> List[T]:
+        if not ids:
+            return []
+        stmt = select(self.model).where(self.model.id.in_(ids))
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
 
     async def get_all(self, offset: int = 0, limit: int = 100) -> Sequence[T]:
         stmt = select(self.model).offset(offset).limit(limit)

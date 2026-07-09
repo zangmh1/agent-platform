@@ -30,6 +30,8 @@ if config.config_file_name is not None:
 # 每自己写一个模块就在此处导入
 from src.core.base_model import Base
 import src.modules.user.model
+import src.modules.permission.model
+import src.modules.role.model
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
