@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     REDIS_PASSWORD: str = ""
     REDIS_DB: int = 0
 
+    # MinIO
+    MINIO_ENDPOINT: str = "localhost:9000"
+    MINIO_ACCESS_KEY: str = ""
+    MINIO_SECRET_KEY: str = ""
+    MINIO_BUCKET: str = "knowledge-docs"
+    MINIO_SECURE: bool = False
+
     LOG_LEVEL: str = "DEBUG"
     LOG_DIR: str = "logs"
 

@@ -12,6 +12,7 @@ import {
   RobotOutlined,
   LineChartOutlined,
   ClockCircleOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../store/auth'
 
@@ -22,6 +23,8 @@ interface ModuleCard {
   desc: string
   icon: React.ReactNode
   tag?: string
+  done?: boolean
+  route?: string
 }
 
 const sysModules: ModuleCard[] = [
@@ -46,34 +49,46 @@ const agentModules: ModuleCard[] = [
   {
     title: '模型供应商',
     desc: '完整的分层架构流程（Model→Schema→Repo→Service→API）、BaseModel 继承、依赖注入、统一响应格式',
-    icon: <ApiOutlined style={{ fontSize: 24, color: '#8c8c8c' }} />,
+    icon: <ApiOutlined style={{ fontSize: 24, color: '#1677ff' }} />,
     tag: '核心',
+    done: true,
+    route: '/providers',
   },
   {
     title: '模型管理',
     desc: 'ForeignKey 外键关联、relationship 自动加载、逗号分隔字符串与列表的转换、_to_read 手动映射模式',
-    icon: <BlockOutlined style={{ fontSize: 24, color: '#8c8c8c' }} />,
+    icon: <BlockOutlined style={{ fontSize: 24, color: '#1677ff' }} />,
+    done: true,
+    route: '/model-mgmt',
   },
   {
     title: 'Prompt 管理',
     desc: '版本快照设计模式（主表+版本表）、JSON 字段存储灵活数据、发布/回滚流程、版本号递增',
-    icon: <FileTextOutlined style={{ fontSize: 24, color: '#8c8c8c' }} />,
+    icon: <FileTextOutlined style={{ fontSize: 24, color: '#1677ff' }} />,
+    done: true,
+    route: '/prompts',
   },
   {
     title: '知识库管理',
     desc: '三层父子关系、cascade 级联删除、冗余计数字段维护、文件上传（UploadFile）、异步处理概念',
-    icon: <DatabaseOutlined style={{ fontSize: 24, color: '#8c8c8c' }} />,
+    icon: <DatabaseOutlined style={{ fontSize: 24, color: '#1677ff' }} />,
+    done: true,
+    route: '/knowledge',
   },
   {
     title: '工具管理',
     desc: 'JSON 存储灵活配置、OpenAI Function Calling 格式、启用/禁用状态机、工具测试',
-    icon: <ToolOutlined style={{ fontSize: 24, color: '#8c8c8c' }} />,
+    icon: <ToolOutlined style={{ fontSize: 24, color: '#1677ff' }} />,
+    done: true,
+    route: '/tools',
   },
   {
     title: 'Agent 管理',
     desc: '聚合根设计、JSON 存储复杂配置、生命周期状态机（draft→active→inactive→error）、版本管理复用',
-    icon: <RobotOutlined style={{ fontSize: 24, color: '#8c8c8c' }} />,
+    icon: <RobotOutlined style={{ fontSize: 24, color: '#1677ff' }} />,
     tag: '核心',
+    done: true,
+    route: '/agents',
   },
   {
     title: '对话日志与统计',
@@ -136,17 +151,26 @@ export default function DashboardPage() {
         <Row gutter={[16, 16]}>
           {agentModules.map((mod) => (
             <Col xs={24} sm={12} xl={8} key={mod.title} style={{ minWidth: 280 }}>
-              <Card hoverable size="small" style={{ height: '100%' }}>
+              <Card
+                hoverable
+                size="small"
+                style={{ height: '100%' }}
+                onClick={mod.done && mod.route ? () => window.location.hash = `#${mod.route}` : undefined}
+              >
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                   <div style={{ flexShrink: 0, marginTop: 2 }}>{mod.icon}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ marginBottom: 4 }}>
                       <Text strong>{mod.title}</Text>
                       {mod.tag && <Tag color="purple" style={{ marginLeft: 6, fontSize: 10 }}>{mod.tag}</Tag>}
+                      {mod.done && <Tag color="green" style={{ marginLeft: 4, fontSize: 10 }}>已完成</Tag>}
                     </div>
                     <div><Text type="secondary" style={{ fontSize: 12, lineHeight: 1.6 }}>{mod.desc}</Text></div>
                   </div>
-                  <ClockCircleOutlined style={{ fontSize: 14, color: '#faad14', flexShrink: 0, marginTop: 4 }} />
+                  {mod.done
+                    ? <CheckCircleOutlined style={{ fontSize: 14, color: '#52c41a', flexShrink: 0, marginTop: 4 }} />
+                    : <ClockCircleOutlined style={{ fontSize: 14, color: '#faad14', flexShrink: 0, marginTop: 4 }} />
+                  }
                 </div>
               </Card>
             </Col>

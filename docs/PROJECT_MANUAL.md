@@ -39,7 +39,13 @@
 | 权限管理 | ✅ 已完成 | CRUD、分页搜索 |
 | 角色管理 | ✅ 已完成 | CRUD、权限分配、分页搜索 |
 | RBAC 鉴权 | ✅ 已完成 | 基于角色的权限检查中间件 |
-| 前端项目 | ✅ 已完成 | React 18 + TS + Vite + Ant Design；侧边栏分为「系统管理」（用户/角色/权限）和「Agent 平台」（7个模块待开发）两级结构 |
+| 模型供应商 | ✅ 已完成 | CRUD、分页搜索、连接测试 |
+| 模型管理 | ✅ 已完成 | CRUD、供应商关联、能力标签、价格管理 |
+| Prompt管理 | ✅ 已完成 | CRUD、变量定义、版本快照、发布/回滚 |
+| 知识库管理 | ✅ 已完成 | KB CRUD、文档上传/删除、分段检索/编辑 |
+| 工具管理 | ✅ 已完成 | CRUD、启用/禁用、Function Calling定义、工具测试 |
+| Agent管理 | ✅ 已完成 | CRUD、生命周期启停、配置管理、版本发布/回滚 |
+| 前端项目 | ✅ 已完成 | React 18 + TS + Vite + Ant Design；系统管理 3 + Agent 平台 6 模块全部完成 |
 
 ### 1.3 项目命名约定
 
@@ -162,6 +168,27 @@ agent-platform/
 │           ├── repository.py     # RoleRepository
 │           ├── service.py        # RoleService
 │           └── api.py            # API 路由（/api/v1/roles）
+│       │
+│       └── provider/             # 模型供应商模块
+│           ├── model.py          # ModelProvider ORM 模型
+│           ├── schema.py         # Pydantic 请求/响应模型
+│           ├── repository.py     # ProviderRepository
+│           ├── service.py        # ProviderService
+│           └── api.py            # API 路由（/api/v1/providers）
+│       │
+│       ├── model/                # 模型管理模块
+│       │   ├── model.py          # LLMModel ORM 模型
+│       │   ├── schema.py         # Pydantic 请求/响应模型
+│       │   ├── repository.py     # ModelRepository
+│       │   ├── service.py        # ModelService（含 _to_read 映射）
+│       │   └── api.py            # API 路由（/api/v1/models）
+│       │
+│       └── prompt/               # Prompt管理模块
+│           ├── model.py          # Prompt + PromptVersion ORM 模型
+│           ├── schema.py         # Pydantic 请求/响应模型（含变量定义）
+│           ├── repository.py     # PromptRepository + PromptVersionRepository
+│           ├── service.py        # PromptService（发布/回滚/版本管理）
+│           └── api.py            # API 路由（/api/v1/prompts）
 │
 ├── test/                         # 测试目录
 │   ├── __init__.py
@@ -608,6 +635,162 @@ user_roles = Table(
 
 ⚠️ **注意**：两个关联表都在 `role/model.py` 中定义，但 `user_roles` 被 `user/model.py` 引用。这是因为 SQLAlchemy 要求 `secondary` 引用的 Table 必须在关联定义之前创建。
 
+### 7.7 模型供应商模块（`modules/provider/`）
+
+**ORM 模型** (`ModelProvider`)：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BigInteger | 主键 |
+| name | String(100) | 供应商名称（唯一） |
+| type | String(50) | 供应商类型：openai/anthropic/aliyun/azure/local/custom |
+| status | String(50) | 连接状态：connected/disconnected/error（默认 disconnected） |
+| endpoint | String(500) | API 端点地址 |
+| api_key | Text | API 密钥（加密存储，可空） |
+| description | String(500) | 供应商描述 |
+
+**ProviderService** 主要方法：
+- `create_provider(data)` — 创建供应商（名称唯一校验 → 状态默认 disconnected → 入库）
+- `list_providers(params)` — 分页查询（支持 name、type 模糊搜索）
+- `get_provider(provider_id)` — 获取供应商详情
+- `update_provider(provider_id, data)` — 部分更新（只更新非 None 字段）
+- `delete_provider(provider_id)` — 删除供应商
+- `test_connection(provider_id)` — 测试连接（成功状态→connected，失败→error）
+
+**前端页面** (`app/src/pages/providers/ProviderListPage.tsx`)：
+- 分页表格 + 搜索（名称/类型）
+- 创建/编辑弹窗（名称、类型下拉、端点 URL、API 密钥、描述）
+- 删除确认
+- 测试连接按钮（调用 `POST /api/v1/providers/{id}/test`，弹窗展示结果）
+- 状态标签：已连接（绿色）、未连接（灰色）、连接失败（红色）
+- 关联模型计数展示
+
+### 7.8 模型管理模块（`modules/model/`）
+
+**ORM 模型** (`LLMModel`)：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BigInteger | 主键 |
+| name | String(100) | 模型显示名称 |
+| model_id | String(100) | 模型标识符（如 gpt-4），唯一 |
+| provider_id | BigInteger | FK → model_providers.id（CASCADE） |
+| capabilities | String(500) | 能力标签，逗号分隔：function_call,vision,streaming |
+| context_length | Integer | 上下文窗口大小（默认 4096） |
+| status | String(50) | 状态：available/unavailable/rate_limited |
+| input_price | Numeric(10,6) | 输入价格/1K tokens |
+| output_price | Numeric(10,6) | 输出价格/1K tokens |
+| currency | String(10) | 货币单位（默认 USD） |
+| is_default | Boolean | 是否为默认模型 |
+| description | Text | 模型描述 |
+
+**核心设计点**：
+- `provider` relationship（selectin 懒加载）→ 通过 `model.provider.name` 获取供应商名称
+- `_to_read()` 方法：ORM → Schema 转换，处理 capabilities 逗号分隔 → 列表、浮点数精度
+- 默认模型唯一性：设置 is_default 时自动取消已有的默认模型
+
+**前端页面** (`app/src/pages/models/ModelListPage.tsx`)：
+- 分页表格 + 按供应商筛选下拉 + 关键字搜索
+- 创建/编辑弹窗：模型名称/标识、供应商选择、能力标签（checkbox）、上下文长度、输入/输出价格、货币、默认模型开关
+- 价格显示：绿色输入价 / 黄色输出价 /1K tokens
+- 状态标签：可用（绿）、不可用（灰）、限速（橙）
+- 默认模型星标标识
+
+### 7.9 Prompt管理模块（`modules/prompt/`）
+
+**双表设计**（版本快照模式）：
+
+| 表 | 说明 |
+|------|------|
+| `prompts` | 主表：当前版本的内容、变量、状态 |
+| `prompt_versions` | 版本表：每次发布时的内容快照、变更说明、发布者 |
+
+**Prompt 主表** (`Prompt`)：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BigInteger | 主键 |
+| name | String(200) | Prompt 名称 |
+| description | String(500) | 描述 |
+| category | String(50) | 分类（general/chat/code/analysis/creative/system） |
+| tags | JSON | 标签列表 |
+| content | Text | Prompt 正文内容 |
+| variables | JSON | 变量定义（name/type/description/default/required） |
+| version | String(50) | 当前版本号（如 v0.1） |
+| status | String(50) | 状态：draft/published |
+| created_by | String(100) | 创建者 |
+
+**PromptVersion 版本表** (`PromptVersion`)：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| prompt_id | BigInteger | FK → prompts.id（CASCADE） |
+| version | String(50) | 版本号 |
+| content | Text | 该版本的完整内容快照 |
+| changelog | String(500) | 变更说明 |
+| is_current | Boolean | 是否为当前版本 |
+| published_by | String(100) | 发布者 |
+| published_at | DateTime | 发布时间 |
+
+**核心设计点**：
+- 发布流程：计算新版本号（v1.2→v1.3）→ 清除旧 is_current → 创建版本快照 → 更新主表状态
+- 回滚流程：查找目标版本 → 覆盖主表 content → 更新 is_current 标记
+- 变量定义使用 JSON 字段存储灵活结构（name/type/description/default_value/required）
+
+**前端页面** (`app/src/pages/prompts/PromptListPage.tsx`)：
+- 统计卡片：总数、已发布、草稿、总变量数 + 分类分布标签
+- 变量定义使用 Form.List 动态增删行（变量名/类型下拉/描述/默认值/必填开关）
+- 发布弹窗：当前版本+状态 Descriptions + 变更说明
+- 版本历史弹窗：版本列表表格，查看内容功能（暗色代码块+变量识别），回滚按钮
+
+### 7.10 知识库管理模块（`modules/knowledge/`）
+
+**三层父子关系**：
+
+```
+KnowledgeBase (知识库)
+    ├── Document (文档) — 1:N
+    │   └── Segment (分段) — 1:N
+    └── cascade 级联删除：删 KB → 删所有关联 Document + Segment
+```
+
+**核心 API**：KB CRUD + 文档上传（multipart）/列表/删除 + 分段列表/编辑/删除
+
+**前端页面** (`app/src/pages/knowledge/KnowledgeBaseListPage.tsx`)：
+- KB 表格 + CRUD：名称、状态（就绪/索引中/异常/空）、文档/分段计数、向量模型
+- 点击「管理」→ 右侧 Drawer 展示详情
+- Drawer 内 Tabs：文档管理 Tab（拖拽上传 + 文档列表 + 删除）+ 分段检索 Tab（搜索 + 内容编辑弹窗）
+- 上传使用 Ant Design Dragger 组件
+- 分段编辑弹窗：Textarea 编辑内容 + 关键词输入
+
+### 7.11 工具管理模块（`modules/tool/`）
+
+**ORM 模型** (`Tool`)：名称、类型（builtin/http_api/custom_function）、启用/禁用状态、JSON 配置（config + function_definition）、调用统计
+
+**核心功能**：状态机（enable/disable）+ 工具测试（传入 JSON 参数，返回执行结果和延迟）
+
+**前端页面** (`app/src/pages/tools/ToolListPage.tsx`)：
+- 统计卡片：工具总数、已启用数、7天调用、平均成功率
+- Switch 开关直接启用/禁用工具（表格内联操作）
+- Function Calling 定义编辑：JSON Textarea（monospace 字体）
+- 工具配置编辑：JSON Textarea
+- 测试弹窗：输入 JSON 参数 → 调用 test API → 展示 Descriptions 结果（成功/失败 + 延迟 + 输出/错误）
+
+### 7.12 Agent管理模块（`modules/agent/`）
+
+**核心设计**：
+- 聚合根模式：Agent 包含 model + prompt + RAG + tools + advanced 五个配置域
+- 生命周期状态机：draft → publish → inactive → active（启停控制）
+- 版本快照管理（复用 Prompt 模式）：发布时创建版本快照，支持回滚
+
+**前端页面** (`app/src/pages/agents/AgentListPage.tsx`)：
+- 统计卡片：Agent 总数、运行中、7天调用、平均成功率
+- 创建/编辑弹窗内嵌 Tabs 配置编辑器（模型/提示词/RAG/工具/高级），每项为 JSON Textarea
+- 关联模型下拉选择（从现有模型列表加载）
+- 生命周期按钮：启动/停止（根据状态动态切换）
+- 发布弹窗 + 版本历史弹窗（含回滚）
+- 配置查看弹窗：Tabs 展示各配置域 JSON（暗色代码块 + 可复制）
+
 ---
 
 ## 8. 数据库设计
@@ -651,6 +834,16 @@ user_roles = Table(
 | `permissions` | 权限表 | id (BigInteger) | - |
 | `user_roles` | 用户-角色关联表 | (user_id, role_id) 复合主键 | → users.id, roles.id (CASCADE) |
 | `role_permissions` | 角色-权限关联表 | (role_id, permission_id) 复合主键 | → roles.id, permissions.id (CASCADE) |
+| `model_providers` | 模型供应商表 | id (BigInteger) | → 被 models.provider_id 引用 |
+| `models` | 大语言模型表 | id (BigInteger) | → models.provider_id → model_providers.id (CASCADE) |
+| `prompts` | Prompt 模板表 | id (BigInteger) | → 被 prompt_versions.prompt_id 引用 |
+| `prompt_versions` | Prompt 版本表 | id (BigInteger) | → prompt_versions.prompt_id → prompts.id (CASCADE) |
+| `knowledge_bases` | 知识库表 | id (BigInteger) | → 被 documents.knowledge_base_id 引用 |
+| `documents` | 文档表 | id (BigInteger) | → documents.knowledge_base_id → knowledge_bases.id (CASCADE) |
+| `segments` | 文档分段表 | id (BigInteger) | → segments.document_id → documents.id (CASCADE) |
+| `tools` | 工具表 | id (BigInteger) | — |
+| `agents` | Agent 表 | id (BigInteger) | → agents.model_id → models.id (SET NULL) |
+| `agent_versions` | Agent 版本表 | id (BigInteger) | → agent_versions.agent_id → agents.id (CASCADE) |
 
 所有表都具有 `id`, `created_at`, `updated_at` 三个基础字段（来自 `BaseModel`）。
 
@@ -751,6 +944,78 @@ alembic history
 | PUT | `/api/v1/roles/{role_id}` | 更新角色 | Bearer Token |
 | DELETE | `/api/v1/roles/{role_id}` | 删除角色 | Bearer Token |
 | PUT | `/api/v1/roles/{role_id}/permissions` | 给角色分配权限 | Bearer Token |
+
+#### 模型供应商
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| POST | `/api/v1/providers` | 创建供应商 | Bearer Token |
+| GET | `/api/v1/providers` | 分页查询供应商列表 | Bearer Token |
+| GET | `/api/v1/providers/{provider_id}` | 供应商详情 | Bearer Token |
+| PUT | `/api/v1/providers/{provider_id}` | 更新供应商 | Bearer Token |
+| DELETE | `/api/v1/providers/{provider_id}` | 删除供应商 | Bearer Token |
+| POST | `/api/v1/providers/{provider_id}/test` | 测试连接 | Bearer Token |
+
+#### 模型管理
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| POST | `/api/v1/models` | 添加模型 | Bearer Token |
+| GET | `/api/v1/models` | 分页查询模型（支持provider_id筛选） | Bearer Token |
+| GET | `/api/v1/models/{model_id}` | 模型详情 | Bearer Token |
+| PUT | `/api/v1/models/{model_id}` | 更新模型 | Bearer Token |
+| DELETE | `/api/v1/models/{model_id}` | 删除模型 | Bearer Token |
+
+#### Prompt管理
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| POST | `/api/v1/prompts` | 创建 Prompt | Bearer Token |
+| GET | `/api/v1/prompts` | 分页查询 Prompt | Bearer Token |
+| GET | `/api/v1/prompts/{prompt_id}` | Prompt 详情 | Bearer Token |
+| PUT | `/api/v1/prompts/{prompt_id}` | 更新 Prompt | Bearer Token |
+| DELETE | `/api/v1/prompts/{prompt_id}` | 删除 Prompt | Bearer Token |
+| POST | `/api/v1/prompts/{prompt_id}/publish` | 发布新版本 | Bearer Token |
+| GET | `/api/v1/prompts/{prompt_id}/versions` | 版本历史列表 | Bearer Token |
+| POST | `/api/v1/prompts/{prompt_id}/rollback` | 回滚到指定版本 | Bearer Token |
+
+#### 知识库管理
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| POST | `/api/v1/knowledge-bases` | 创建知识库 | Bearer Token |
+| GET | `/api/v1/knowledge-bases` | 分页查询知识库列表 | Bearer Token |
+| GET | `/api/v1/knowledge-bases/{kb_id}` | 知识库详情 | Bearer Token |
+| PUT | `/api/v1/knowledge-bases/{kb_id}` | 更新知识库 | Bearer Token |
+| DELETE | `/api/v1/knowledge-bases/{kb_id}` | 删除知识库（级联删除文档/分段） | Bearer Token |
+| POST | `/api/v1/knowledge-bases/{kb_id}/documents` | 上传文档（multipart） | Bearer Token |
+| GET | `/api/v1/knowledge-bases/{kb_id}/documents` | 文档列表 | Bearer Token |
+| DELETE | `/api/v1/knowledge-bases/{kb_id}/documents/{doc_id}` | 删除文档 | Bearer Token |
+| GET | `/api/v1/knowledge-bases/{kb_id}/segments` | 分段列表 | Bearer Token |
+| PUT | `/api/v1/knowledge-bases/{kb_id}/segments/{seg_id}` | 编辑分段内容 | Bearer Token |
+| DELETE | `/api/v1/knowledge-bases/{kb_id}/segments/{seg_id}` | 删除分段 | Bearer Token |
+
+#### 工具管理
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| POST | `/api/v1/tools` | 注册工具 | Bearer Token |
+| GET | `/api/v1/tools` | 分页查询工具列表 | Bearer Token |
+| GET | `/api/v1/tools/{tool_id}` | 工具详情 | Bearer Token |
+| PUT | `/api/v1/tools/{tool_id}` | 更新工具 | Bearer Token |
+| DELETE | `/api/v1/tools/{tool_id}` | 删除工具 | Bearer Token |
+| POST | `/api/v1/tools/{tool_id}/enable` | 启用工具 | Bearer Token |
+| POST | `/api/v1/tools/{tool_id}/disable` | 禁用工具 | Bearer Token |
+| POST | `/api/v1/tools/{tool_id}/test` | 测试工具（传入 JSON 参数） | Bearer Token |
+
+#### Agent管理
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| POST | `/api/v1/agents` | 创建 Agent | Bearer Token |
+| GET | `/api/v1/agents` | 分页查询 Agent 列表 | Bearer Token |
+| GET | `/api/v1/agents/{agent_id}` | Agent 详情 | Bearer Token |
+| PUT | `/api/v1/agents/{agent_id}` | 更新 Agent | Bearer Token |
+| DELETE | `/api/v1/agents/{agent_id}` | 删除 Agent | Bearer Token |
+| POST | `/api/v1/agents/{agent_id}/start` | 启动 Agent | Bearer Token |
+| POST | `/api/v1/agents/{agent_id}/stop` | 停止 Agent | Bearer Token |
+| POST | `/api/v1/agents/{agent_id}/publish` | 发布版本 | Bearer Token |
+| GET | `/api/v1/agents/{agent_id}/versions` | 版本列表 | Bearer Token |
+| POST | `/api/v1/agents/{agent_id}/rollback` | 回滚到指定版本 | Bearer Token |
 
 ### 9.3 请求/响应示例
 
@@ -959,12 +1224,12 @@ app/
 | **系统管理** | `/users` | UserListPage（用户管理） | ✅ |
 | | `/roles` | RoleListPage（角色管理） | ✅ |
 | | `/permissions` | PermissionListPage（权限管理） | ✅ |
-| **Agent 平台** | `/providers` | 模型供应商 | ⬜ 待开发 |
-| | `/model-mgmt` | 模型管理 | ⬜ 待开发 |
-| | `/prompts` | Prompt 管理 | ⬜ 待开发 |
-| | `/knowledge` | 知识库管理 | ⬜ 待开发 |
-| | `/tools` | 工具管理 | ⬜ 待开发 |
-| | `/agents` | Agent 管理 | ⬜ 待开发 |
+| **Agent 平台** | `/providers` | 模型供应商 | ✅ |
+| | `/model-mgmt` | 模型管理 | ✅ |
+| | `/prompts` | Prompt 管理 | ✅ |
+| | `/knowledge` | 知识库管理 | ✅ |
+| | `/tools` | 工具管理 | ✅ |
+| | `/agents` | Agent 管理 | ✅ |
 | | `/conversations` | 对话日志与统计 | ⬜ 待开发 |
 
 **首页（Dashboard）** 展示完整的平台功能全景：
